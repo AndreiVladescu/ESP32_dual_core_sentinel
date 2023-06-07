@@ -37,13 +37,13 @@ volatile bool dataReadyFlag = false;
 volatile bool sendDataFlag = false;
 
 /* Control */
-const int fire_ctrl             = 0x10;
-const int move_step_a_ctrl      = 0x20;
-const int move_step_r_ctrl      = 0x30;
+const int fire_ctrl = 0x10;
+const int move_step_a_ctrl = 0x20;
+const int move_step_r_ctrl = 0x30;
 const int send_orientation_ctrl = 0x40;
-const int move_servo_a_ctrl     = 0x50;
-const int move_servo_r_ctrl     = 0x60;
-const int scram_ctrl            = 0x70;
+const int move_servo_a_ctrl = 0x50;
+const int move_servo_r_ctrl = 0x60;
+const int scram_ctrl = 0x70;
 
 /* Function to initialise sensors */
 void initSensors() {
@@ -65,7 +65,6 @@ void sendDataTask(void *pvParameters) {
     // Wait until data is ready
     while (!dataReadyFlag || !sendDataFlag) {
       vTaskDelay(1);  // This delay helps to prevent the task from hogging CPU time
-      yield;
     }
     xSemaphoreTake(sensor_mutex, portMAX_DELAY);
     Serial.print(int(medianOrientation.roll));
@@ -86,24 +85,28 @@ void sendDataTask(void *pvParameters) {
   }
 }
 
-void manageCommands(byte ctrl) {
+bool manageCommands(byte ctrl) {
   if (ctrl == fire_ctrl) {
     /*Fire*/
     Serial.println("Fire");
   } else if (ctrl == move_step_a_ctrl) {
     /*Move*/
-    Serial.println("Move a");
+    Serial.println("Stepper a");
+    return true;
   } else if (ctrl == move_step_r_ctrl) {
     /*Move*/
-    Serial.println("Move r");
+    Serial.println("Stepper r");
+    return true;
   } else if (ctrl == send_orientation_ctrl) {
     sendDataFlag = true;
   } else if (ctrl == move_servo_a_ctrl) {
     /*Move*/
-    Serial.println("Move a");
+    Serial.println("Servo a");
+    return true;
   } else if (ctrl == move_servo_r_ctrl) {
     /*Move*/
-    Serial.println("Move r");
+    Serial.println("Servo r");
+    return true;
   } else if (ctrl == scram_ctrl) {
     /*Scram*/
     Serial.println("Scram");
@@ -111,6 +114,7 @@ void manageCommands(byte ctrl) {
     /*Carry on*/
     Serial.println("Carry on");
   }
+  return false;
 }
 
 // This task will run on core 0 and will receive data
@@ -118,29 +122,39 @@ void receiveDataTask(void *pvParameters) {
   static double new_angle = 0;
   static const int max_chars = 7;
   static char rx_string[max_chars];
-  static uint8_t rx_i = 0;
+  static int8_t rx_i = -1;
   static byte buffer_byte;
-  
+  static bool temp_rc = false;
+
   while (1) {
     // Wait until data is received
     while (Serial.available() > 0) {
       char ch = Serial.read();
 
-      //Serial.println(ch, HEX);
+      Serial.println(ch, HEX);
 
-      if (rx_i == 0)
+      if (rx_i == -1){
         buffer_byte = (byte)ch;
+        Serial.print("Buffer byte is: ");
+        Serial.println(buffer_byte, HEX);
+        rx_i++;
+        continue;
+      }
 
       if (rx_i < max_chars && (isDigit(ch) || ch == '.')) {
         rx_string[rx_i++] = ch;
-      } else{
-        if (ch != '\n')
-          manageCommands((byte)buffer_byte);
-        rx_string[rx_i] = 0;
-        
-        new_angle = atof(rx_string);
-        Serial.print(new_angle, 2); 
-        rx_i = 0;
+      } else {
+        if (ch == '\n')
+          temp_rc = manageCommands((byte)buffer_byte);
+
+        if (temp_rc) {
+          rx_string[rx_i] = 0;
+          new_angle = atof(rx_string);
+          Serial.println(new_angle, 2);
+          temp_rc = false;
+        }
+
+        rx_i = -1;
       }
     }
     vTaskDelay(1 / portTICK_PERIOD_MS);
@@ -223,6 +237,7 @@ void setup() {
                           1,
                           &Task3,
                           app_cpu);
+                          
   /* Delete setup and loop tasks */
   vTaskDelete(NULL);
 }
