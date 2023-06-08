@@ -7,6 +7,9 @@
 #include <Adafruit_LSM303_U.h>
 #include <Adafruit_9DOF.h>
 #include <Adafruit_L3GD20_U.h>
+#include <AccelStepper.h>
+
+#include "stepper_driver.h"
 
 typedef struct median_orientation_t {
   float roll = 0,
@@ -19,8 +22,7 @@ typedef struct median_orientation_t {
 static const BaseType_t pro_cpu = 0;
 static const BaseType_t app_cpu = 0;
 
-
-TaskHandle_t Task1, Task2, Task3, TaskCommand;
+TaskHandle_t Task1, Task2, Task3, TaskMotors, TaskCommand;
 
 static SemaphoreHandle_t sensor_mutex;
 
@@ -30,20 +32,31 @@ Adafruit_9DOF dof = Adafruit_9DOF();
 Adafruit_LSM303_Accel_Unified accel = Adafruit_LSM303_Accel_Unified(30301);
 Adafruit_LSM303_Mag_Unified mag = Adafruit_LSM303_Mag_Unified(30302);
 
+extern AccelStepper stepper_az;
+extern AccelStepper stepper_el;
 // This is your shared flag. Volatile keyword is used here
 // to prevent the compiler from optimizing out checks to this variable.
 volatile bool dataReadyFlag = false;
-
 volatile bool sendDataFlag = false;
 
 /* Control */
 const int fire_ctrl = 0x10;
 const int move_step_a_ctrl = 0x20;
-const int move_step_r_ctrl = 0x30;
+const int move_step_e_ctrl = 0x30;
 const int send_orientation_ctrl = 0x40;
 const int move_servo_a_ctrl = 0x50;
-const int move_servo_r_ctrl = 0x60;
+const int move_servo_e_ctrl = 0x60;
 const int scram_ctrl = 0x70;
+
+void initMotors() {
+  stepper_el.setMaxSpeed(10000);
+  stepper_el.setSpeed(1000);
+  stepper_el.setAcceleration(1000);
+
+  stepper_az.setMaxSpeed(10000);
+  stepper_az.setSpeed(1000);
+  stepper_az.setAcceleration(1000);
+}
 
 /* Function to initialise sensors */
 void initSensors() {
@@ -93,9 +106,10 @@ bool manageCommands(byte ctrl) {
     /*Move*/
     Serial.println("Stepper a");
     return true;
-  } else if (ctrl == move_step_r_ctrl) {
+  } else if (ctrl == move_step_e_ctrl) {
     /*Move*/
-    Serial.println("Stepper r");
+    Serial.println("Stepper e");
+    stepper_el.move(100 * 32);
     return true;
   } else if (ctrl == send_orientation_ctrl) {
     sendDataFlag = true;
@@ -103,9 +117,9 @@ bool manageCommands(byte ctrl) {
     /*Move*/
     Serial.println("Servo a");
     return true;
-  } else if (ctrl == move_servo_r_ctrl) {
+  } else if (ctrl == move_servo_e_ctrl) {
     /*Move*/
-    Serial.println("Servo r");
+    Serial.println("Servo e");
     return true;
   } else if (ctrl == scram_ctrl) {
     /*Scram*/
@@ -133,7 +147,7 @@ void receiveDataTask(void *pvParameters) {
 
       Serial.println(ch, HEX);
 
-      if (rx_i == -1){
+      if (rx_i == -1) {
         buffer_byte = (byte)ch;
         Serial.print("Buffer byte is: ");
         Serial.println(buffer_byte, HEX);
@@ -203,12 +217,23 @@ void computeDataTask(void *pvParameters) {
   }
 }
 
+void motorsTask(void *pvParameters) {
+  while (1) {
+    stepper_el.run();
+    stepper_az.run();
+    vTaskDelay(1 / portTICK_PERIOD_MS);
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   Serial.println(F("Adafruit 9 DOF Pitch/Roll/Heading Example"));
 
   /* Initialise the sensors */
   initSensors();
+
+  /* Initialise the motors */
+  initMotors();
 
   /* Initialise Mutex */
   sensor_mutex = xSemaphoreCreateMutex();
@@ -237,7 +262,15 @@ void setup() {
                           1,
                           &Task3,
                           app_cpu);
-                          
+
+  xTaskCreatePinnedToCore(motorsTask,
+                          "Motors running Task",
+                          8192,
+                          NULL,
+                          1,
+                          &TaskMotors,
+                          app_cpu);
+
   /* Delete setup and loop tasks */
   vTaskDelete(NULL);
 }
