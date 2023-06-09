@@ -46,7 +46,8 @@ const int move_step_e_ctrl = 0x30;
 const int send_orientation_ctrl = 0x40;
 const int move_servo_a_ctrl = 0x50;
 const int move_servo_e_ctrl = 0x60;
-const int scram_ctrl = 0x70;
+const int scram_ctrl = 0x53;
+const int restore_ctrl = 0x52;
 
 void initMotors() {
   stepper_el.setMaxSpeed(10000);
@@ -98,37 +99,46 @@ void sendDataTask(void *pvParameters) {
   }
 }
 
-bool manageCommands(byte ctrl) {
+void manageCommands(byte ctrl, const char *rx_string) {
+  double angle;
+
   if (ctrl == fire_ctrl) {
     /*Fire*/
     Serial.println("Fire");
   } else if (ctrl == move_step_a_ctrl) {
     /*Move*/
     Serial.println("Stepper a");
-    return true;
+    angle = atof(rx_string);
+    stepper_az.moveTo(angle * MICROSTEPS / 1.8);
   } else if (ctrl == move_step_e_ctrl) {
     /*Move*/
     Serial.println("Stepper e");
-    stepper_el.move(100 * 32);
-    return true;
+    angle = atof(rx_string);
+    stepper_el.moveTo(angle * MICROSTEPS / 1.8);
   } else if (ctrl == send_orientation_ctrl) {
+    /*Send orientation data*/
     sendDataFlag = true;
   } else if (ctrl == move_servo_a_ctrl) {
     /*Move*/
     Serial.println("Servo a");
-    return true;
   } else if (ctrl == move_servo_e_ctrl) {
     /*Move*/
     Serial.println("Servo e");
-    return true;
   } else if (ctrl == scram_ctrl) {
     /*Scram*/
     Serial.println("Scram");
+    // Inverted?
+    stepper_az.enableOutputs();
+    stepper_el.enableOutputs();
+  } else if (ctrl == restore_ctrl) {
+    /*Scram*/
+    Serial.println("Restore Control");
+    stepper_az.disableOutputs();
+    stepper_el.disableOutputs();
   } else {
     /*Carry on*/
     Serial.println("Carry on");
   }
-  return false;
 }
 
 // This task will run on core 0 and will receive data
@@ -138,19 +148,18 @@ void receiveDataTask(void *pvParameters) {
   static char rx_string[max_chars];
   static int8_t rx_i = -1;
   static byte buffer_byte;
-  static bool temp_rc = false;
 
   while (1) {
     // Wait until data is received
     while (Serial.available() > 0) {
       char ch = Serial.read();
 
-      Serial.println(ch, HEX);
+      //Serial.println(ch, HEX);
 
       if (rx_i == -1) {
         buffer_byte = (byte)ch;
-        Serial.print("Buffer byte is: ");
-        Serial.println(buffer_byte, HEX);
+        //Serial.print("Buffer byte is: ");
+        //Serial.println(buffer_byte, HEX);
         rx_i++;
         continue;
       }
@@ -158,16 +167,10 @@ void receiveDataTask(void *pvParameters) {
       if (rx_i < max_chars && (isDigit(ch) || ch == '.')) {
         rx_string[rx_i++] = ch;
       } else {
-        if (ch == '\n')
-          temp_rc = manageCommands((byte)buffer_byte);
-
-        if (temp_rc) {
+        if (ch == '\n') {
           rx_string[rx_i] = 0;
-          new_angle = atof(rx_string);
-          Serial.println(new_angle, 2);
-          temp_rc = false;
+          manageCommands((byte)buffer_byte, rx_string);
         }
-
         rx_i = -1;
       }
     }
