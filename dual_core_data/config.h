@@ -3,6 +3,7 @@
 
 #define DIR_PIN 19
 #define STEP_PIN 18
+#define ENABLE_PIN 5
 #define MOTOR_INTERFACE 1
 
 #define MICROSTEPS 32

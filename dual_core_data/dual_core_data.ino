@@ -53,6 +53,8 @@ void initMotors() {
   stepper_el.setMaxSpeed(10000);
   stepper_el.setSpeed(1000);
   stepper_el.setAcceleration(1000);
+  stepper_el.setEnablePin(ENABLE_PIN);
+  stepper_el.disableOutputs();
 
   stepper_az.setMaxSpeed(10000);
   stepper_az.setSpeed(1000);
