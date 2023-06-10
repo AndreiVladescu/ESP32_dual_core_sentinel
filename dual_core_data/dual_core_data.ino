@@ -49,6 +49,11 @@ const int move_servo_e_ctrl = 0x60;
 const int scram_ctrl = 0x53;
 const int restore_ctrl = 0x52;
 
+/* Current positon */
+double az_angle = 0;
+double el_angle = 0;
+
+
 void initMotors() {
   stepper_el.setMaxSpeed(10000);
   stepper_el.setSpeed(1000);
@@ -129,12 +134,13 @@ void manageCommands(byte ctrl, const char *rx_string) {
   } else if (ctrl == scram_ctrl) {
     /*Scram*/
     Serial.println("Scram");
-    // Inverted?
+    // Inverted controls
     stepper_az.enableOutputs();
     stepper_el.enableOutputs();
   } else if (ctrl == restore_ctrl) {
-    /*Scram*/
+    /*Restore motor function*/
     Serial.println("Restore Control");
+    // Inverted controls
     stepper_az.disableOutputs();
     stepper_el.disableOutputs();
   } else {
@@ -230,6 +236,46 @@ void motorsTask(void *pvParameters) {
   }
 }
 
+void homingProcedure() {
+
+  /* Elevation homing based on pitch data from the 9-DOF sensor */
+  sensors_event_t accel_event;
+  sensors_event_t mag_event;
+  sensors_vec_t orientation;
+
+  accel.getEvent(&accel_event);
+  mag.getEvent(&mag_event);
+
+  while (!dof.fusionGetOrientation(&accel_event, &mag_event, &orientation)) {
+    vTaskDelay(1 / portTICK_PERIOD_MS);
+  }
+  float angle = -orientation.pitch;
+  stepper_el.moveTo(angle * MICROSTEPS / 1.8);
+  while (stepper_el.distanceToGo() != 0) {
+    stepper_el.run();
+    vTaskDelay(1 / portTICK_PERIOD_MS);
+  }
+  el_angle = 90;
+
+  /* Azimuth homing based on end-stop switch */
+  long max_distance = -999999;
+  stepper_az.moveTo(max_distance * MICROSTEPS);
+  while (stepper.distanceToGo() != 0) {
+    stepper.run();
+    // If stepper arrived to end switch, it's at almost 180 degrees out of phase
+    // 
+    if (digitalRead(SW_PIN_HOME) == LOW)
+    {
+
+    }
+    vTaskDelay(1 / portTICK_PERIOD_MS);
+  }
+}
+
+void gpioInit() {
+  pinMode(SW_PIN_HOME, INPUT_PULLUP);
+}
+
 void setup() {
   Serial.begin(115200);
   Serial.println(F("Adafruit 9 DOF Pitch/Roll/Heading Example"));
@@ -239,6 +285,12 @@ void setup() {
 
   /* Initialise the motors */
   initMotors();
+
+  /* GPIO config */
+  gpioInit();
+
+  /* Home in */
+  homingProcedure();
 
   /* Initialise Mutex */
   sensor_mutex = xSemaphoreCreateMutex();
