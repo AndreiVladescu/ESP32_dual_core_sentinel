@@ -8,6 +8,7 @@
 #include <Adafruit_9DOF.h>
 #include <Adafruit_L3GD20_U.h>
 #include <AccelStepper.h>
+#include <Servo.h>
 
 #include "stepper_driver.h"
 
@@ -32,8 +33,14 @@ Adafruit_9DOF dof = Adafruit_9DOF();
 Adafruit_LSM303_Accel_Unified accel = Adafruit_LSM303_Accel_Unified(30301);
 Adafruit_LSM303_Mag_Unified mag = Adafruit_LSM303_Mag_Unified(30302);
 
+/* System-wide steppers */
 extern AccelStepper stepper_az;
 extern AccelStepper stepper_el;
+
+/* Visor servos */
+Servo servo_az;
+Servo servo_el;
+
 // This is your shared flag. Volatile keyword is used here
 // to prevent the compiler from optimizing out checks to this variable.
 volatile bool dataReadyFlag = false;
@@ -53,8 +60,8 @@ const int restore_ctrl = 0x52;
 double az_angle = 0;
 double el_angle = 0;
 
-
 void initMotors() {
+  /* System-wide steppers */
   stepper_el.setMaxSpeed(10000);
   stepper_el.setSpeed(1000);
   stepper_el.setAcceleration(1000);
@@ -64,6 +71,15 @@ void initMotors() {
   stepper_az.setMaxSpeed(10000);
   stepper_az.setSpeed(1000);
   stepper_az.setAcceleration(1000);
+  stepper_az.setEnablePin(ENABLE_PIN);
+  stepper_az.disableOutputs();
+
+  /* Visor servos */
+  /*
+  servo_az.attach(SERVO_PIN_AZ);
+  servo_el.attach(SERVO_PIN_EL);
+  servo_az.write(90);
+  servo_el.write(90);*/
 }
 
 /* Function to initialise sensors */
@@ -116,21 +132,41 @@ void manageCommands(byte ctrl, const char *rx_string) {
     /*Move*/
     Serial.println("Stepper a");
     angle = atof(rx_string);
-    stepper_az.moveTo(angle * MICROSTEPS / 1.8);
+    if (angle = > SFZN_SYS_LWR_BND_AZ && angle <= SFZN_SYS_HGH_BND_AZ) {
+      stepper_az.moveTo(angle * MICROSTEPS / 1.8);
+    } else {
+      Serial.println("Stepper out of bounds");
+    }
   } else if (ctrl == move_step_e_ctrl) {
     /*Move*/
     Serial.println("Stepper e");
     angle = atof(rx_string);
-    stepper_el.moveTo(angle * MICROSTEPS / 1.8);
+    if (angle = > SFZN_SYS_LWR_BND_EL && angle <= SFZN_SYS_HGH_BND_EL) {
+      stepper_el.moveTo(angle * MICROSTEPS / 1.8);
+    } else {
+      Serial.println("Stepper out of bounds");
+    }
   } else if (ctrl == send_orientation_ctrl) {
     /*Send orientation data*/
     sendDataFlag = true;
   } else if (ctrl == move_servo_a_ctrl) {
     /*Move*/
     Serial.println("Servo a");
+    angle = atof(rx_string);
+    if (angle = > SFZN_VIZ_LWR_BND_AZ && angle <= SFZN_VIZ_HGH_BND_AZ) {
+      servo_az.write(angle);
+    } else {
+      Serial.println("Servo out of bounds");
+    }
   } else if (ctrl == move_servo_e_ctrl) {
     /*Move*/
     Serial.println("Servo e");
+    angle = atof(rx_string);
+    if (angle = > SFZN_VIZ_LWR_BND_EL && angle <= SFZN_VIZ_HGH_BND_EL) {
+      servo_az.write(angle);
+    } else {
+      Serial.println("Servo out of bounds");
+    }
   } else if (ctrl == scram_ctrl) {
     /*Scram*/
     Serial.println("Scram");
@@ -263,10 +299,8 @@ void homingProcedure() {
   while (stepper.distanceToGo() != 0) {
     stepper.run();
     // If stepper arrived to end switch, it's at almost 180 degrees out of phase
-    // 
-    if (digitalRead(SW_PIN_HOME) == LOW)
-    {
-
+    //
+    if (digitalRead(SW_PIN_HOME) == LOW) {
     }
     vTaskDelay(1 / portTICK_PERIOD_MS);
   }

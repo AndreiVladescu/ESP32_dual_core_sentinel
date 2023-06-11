@@ -1,5 +1,4 @@
 #define SW_PIN_HOME 2
-#define SW_PIN_END 3
 
 #define DIR_PIN 19
 #define STEP_PIN 18
@@ -7,3 +6,18 @@
 #define MOTOR_INTERFACE 1
 
 #define MICROSTEPS 32
+
+#define SERVO_PIN_AZ 555
+#define SERVO_PIN_EL 675
+
+#define SFZN_SYS_LWR_BND_AZ -175
+#define SFZN_SYS_HGH_BND_AZ 175
+
+#define SFZN_SYS_LWR_BND_EL -25
+#define SFZN_SYS_HGH_BND_EL 25
+
+#define SFZN_VIZ_LWR_BND_AZ 0
+#define SFZN_VIZ_HGH_BND_AZ 180
+
+#define SFZN_VIZ_LWR_BND_EL 70
+#define SFZN_VIZ_HGH_BND_EL 135
