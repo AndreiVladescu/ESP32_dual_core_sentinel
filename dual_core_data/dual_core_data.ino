@@ -309,7 +309,7 @@ void homingProcedure() {
     stepper_az.move(50);
     stepper_az.runSpeed();
   }
-  stepper_az.moveTo(175);
+  stepper_az.moveTo(175 * MICROSTEPS / 1.8);
   while(stepper_az.distanceToGo() != 0){
     stepper_az.run();
   }
