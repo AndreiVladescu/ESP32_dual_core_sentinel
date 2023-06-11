@@ -296,14 +296,24 @@ void homingProcedure() {
   /* Azimuth homing based on end-stop switch */
   long max_distance = -999999;
   stepper_az.moveTo(max_distance * MICROSTEPS);
-  while (stepper.distanceToGo() != 0) {
-    stepper.run();
+  while (stepper_az.distanceToGo() != 0) {
+    stepper_az.run();
     // If stepper arrived to end switch, it's at almost 180 degrees out of phase
     //
     if (digitalRead(SW_PIN_HOME) == LOW) {
+      break;
     }
     vTaskDelay(1 / portTICK_PERIOD_MS);
   }
+  while (digitalRead(SW_PIN_HOME) == LOW) {
+    stepper_az.move(50);
+    stepper_az.runSpeed();
+  }
+  stepper_az.moveTo(175);
+  while(stepper_az.distanceToGo() != 0){
+    stepper_az.run();
+  }
+  stepper_az.setCurrentPosition(0);
 }
 
 void gpioInit() {
