@@ -8,7 +8,7 @@
 #include <Adafruit_9DOF.h>
 #include <Adafruit_L3GD20_U.h>
 #include <AccelStepper.h>
-#include <Servo.h>
+#include <ESP32Servo.h>
 
 #include "stepper_driver.h"
 
@@ -23,7 +23,11 @@ typedef struct median_orientation_t {
 static const BaseType_t pro_cpu = 0;
 static const BaseType_t app_cpu = 0;
 
-TaskHandle_t Task1, Task2, Task3, TaskMotors, TaskCommand;
+TaskHandle_t TaskSendData,
+  TaskRecvData,
+  TaskComputeData,
+  TaskMotors,
+  TaskCommand;
 
 static SemaphoreHandle_t sensor_mutex;
 
@@ -40,6 +44,7 @@ extern AccelStepper stepper_el;
 /* Visor servos */
 Servo servo_az;
 Servo servo_el;
+Servo servo_trg;
 
 // This is your shared flag. Volatile keyword is used here
 // to prevent the compiler from optimizing out checks to this variable.
@@ -65,21 +70,24 @@ void initMotors() {
   stepper_el.setMaxSpeed(10000);
   stepper_el.setSpeed(1000);
   stepper_el.setAcceleration(1000);
-  stepper_el.setEnablePin(ENABLE_PIN);
+  stepper_el.setEnablePin(ENABLE_PIN_EL);
   stepper_el.disableOutputs();
 
   stepper_az.setMaxSpeed(10000);
   stepper_az.setSpeed(1000);
   stepper_az.setAcceleration(1000);
-  stepper_az.setEnablePin(ENABLE_PIN);
+  stepper_az.setEnablePin(ENABLE_PIN_AZ);
   stepper_az.disableOutputs();
 
   /* Visor servos */
-  /*
   servo_az.attach(SERVO_PIN_AZ);
   servo_el.attach(SERVO_PIN_EL);
   servo_az.write(90);
-  servo_el.write(90);*/
+  servo_el.write(90);
+
+  /* Trigger servo */
+  servo_trg.attach(SERVO_PIN_TRG);
+
 }
 
 /* Function to initialise sensors */
@@ -132,7 +140,7 @@ void manageCommands(byte ctrl, const char *rx_string) {
     /*Move*/
     Serial.println("Stepper a");
     angle = atof(rx_string);
-    if (angle = > SFZN_SYS_LWR_BND_AZ && angle <= SFZN_SYS_HGH_BND_AZ) {
+    if (angle >= SFZN_SYS_LWR_BND_AZ && angle <= SFZN_SYS_HGH_BND_AZ) {
       stepper_az.moveTo(angle * MICROSTEPS / 1.8);
     } else {
       Serial.println("Stepper out of bounds");
@@ -141,7 +149,7 @@ void manageCommands(byte ctrl, const char *rx_string) {
     /*Move*/
     Serial.println("Stepper e");
     angle = atof(rx_string);
-    if (angle = > SFZN_SYS_LWR_BND_EL && angle <= SFZN_SYS_HGH_BND_EL) {
+    if (angle >= SFZN_SYS_LWR_BND_EL && angle <= SFZN_SYS_HGH_BND_EL) {
       stepper_el.moveTo(angle * MICROSTEPS / 1.8);
     } else {
       Serial.println("Stepper out of bounds");
@@ -153,7 +161,7 @@ void manageCommands(byte ctrl, const char *rx_string) {
     /*Move*/
     Serial.println("Servo a");
     angle = atof(rx_string);
-    if (angle = > SFZN_VIZ_LWR_BND_AZ && angle <= SFZN_VIZ_HGH_BND_AZ) {
+    if (angle >= SFZN_VIZ_LWR_BND_AZ && angle <= SFZN_VIZ_HGH_BND_AZ) {
       servo_az.write(angle);
     } else {
       Serial.println("Servo out of bounds");
@@ -162,7 +170,7 @@ void manageCommands(byte ctrl, const char *rx_string) {
     /*Move*/
     Serial.println("Servo e");
     angle = atof(rx_string);
-    if (angle = > SFZN_VIZ_LWR_BND_EL && angle <= SFZN_VIZ_HGH_BND_EL) {
+    if (angle >= SFZN_VIZ_LWR_BND_EL && angle <= SFZN_VIZ_HGH_BND_EL) {
       servo_az.write(angle);
     } else {
       Serial.println("Servo out of bounds");
@@ -241,7 +249,7 @@ void computeDataTask(void *pvParameters) {
 
     if (dof.fusionGetOrientation(&accel_event, &mag_event, &orientation)) {
       if (medianOrientation.currentSampleCounter == medianOrientation.overSampleRate) {
-        medianOrientation.roll = medianOrientation.roll / medianOrientation.overSampleRate;
+        //medianOrientation.roll = medianOrientation.roll / medianOrientation.overSampleRate;
         medianOrientation.pitch = medianOrientation.pitch / medianOrientation.overSampleRate;
         medianOrientation.heading = medianOrientation.heading / medianOrientation.overSampleRate;
 
@@ -252,7 +260,7 @@ void computeDataTask(void *pvParameters) {
         //Serial.println("Core 2 finished work");
       } else {
         medianOrientation.currentSampleCounter++;
-        medianOrientation.roll += orientation.roll;
+        //medianOrientation.roll += orientation.roll;
         medianOrientation.pitch += orientation.pitch;
         medianOrientation.heading += orientation.heading;
       }
@@ -310,7 +318,7 @@ void homingProcedure() {
     stepper_az.runSpeed();
   }
   stepper_az.moveTo(175 * MICROSTEPS / 1.8);
-  while(stepper_az.distanceToGo() != 0){
+  while (stepper_az.distanceToGo() != 0) {
     stepper_az.run();
   }
   stepper_az.setCurrentPosition(0);
@@ -345,7 +353,7 @@ void setup() {
                           8192,
                           NULL,
                           1,
-                          &Task1,
+                          &TaskSendData,
                           pro_cpu);
 
   xTaskCreatePinnedToCore(receiveDataTask,
@@ -353,7 +361,7 @@ void setup() {
                           8192,
                           NULL,
                           1,
-                          &Task2,
+                          &TaskRecvData,
                           pro_cpu);
 
   xTaskCreatePinnedToCore(computeDataTask,
@@ -361,7 +369,7 @@ void setup() {
                           8192,
                           NULL,
                           1,
-                          &Task3,
+                          &TaskComputeData,
                           app_cpu);
 
   xTaskCreatePinnedToCore(motorsTask,
