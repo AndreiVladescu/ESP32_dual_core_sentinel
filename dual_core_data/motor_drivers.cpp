@@ -1,10 +1,3 @@
-#include <AccelStepper.h>
-#include <ESP32Servo.h>
-#include <Adafruit_Sensor.h>
-#include <Adafruit_LSM303_U.h>
-#include <Adafruit_9DOF.h>
-#include <Adafruit_L3GD20_U.h>
-
 #include "motor_drivers.h"
 
 AccelStepper stepper_az(MOTOR_INTERFACE, STEP_PIN_AZ, DIR_PIN_AZ);
@@ -47,6 +40,7 @@ void initMotors() {
 
 }
 
+/* Function to home-in the steppers */
 void homingProcedure() {
 
   /* Elevation homing based on pitch data from the 9-DOF sensor */
@@ -89,4 +83,12 @@ void homingProcedure() {
     stepper_az.run();
   }
   stepper_az.setCurrentPosition(0);
+}
+
+/* Function to action the trigger */
+void fireProcedure(){
+  servo_trg.write(TRIGGER_FIRE_POS);
+  delay(1000);
+  servo_trg.write(TRIGGER_REST_POS);
+  delay(100);
 }

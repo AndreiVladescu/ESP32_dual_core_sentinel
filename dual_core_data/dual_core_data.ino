@@ -2,23 +2,8 @@
 #include "freertos/task.h"
 #include "esp_system.h"
 
-#include <Wire.h>
-#include <Adafruit_Sensor.h>
-#include <Adafruit_LSM303_U.h>
-#include <Adafruit_9DOF.h>
-#include <Adafruit_L3GD20_U.h>
-#include <AccelStepper.h>
-#include <ESP32Servo.h>
-
 #include "motor_drivers.h"
-
-typedef struct median_orientation_t {
-  float roll = 0,
-        pitch = 0,
-        heading = 0;
-  uint8_t overSampleRate = 31;
-  uint8_t currentSampleCounter = 0;
-};
+#include "gpio_aux.h"
 
 static const BaseType_t pro_cpu = 0;
 static const BaseType_t app_cpu = 0;
@@ -51,33 +36,9 @@ extern Servo servo_trg;
 volatile bool dataReadyFlag = false;
 volatile bool sendDataFlag = false;
 
-/* Control */
-const int fire_ctrl = 0x10;
-const int move_step_a_ctrl = 0x20;
-const int move_step_e_ctrl = 0x30;
-const int send_orientation_ctrl = 0x40;
-const int move_servo_a_ctrl = 0x50;
-const int move_servo_e_ctrl = 0x60;
-const int scram_ctrl = 0x53;
-const int restore_ctrl = 0x52;
-
 /* Current positon */
 double az_angle = 0;
 double el_angle = 0;
-
-/* Function to initialise sensors */
-void initSensors() {
-  if (!accel.begin()) {
-    Serial.println(F("Ooops, no LSM303 detected ... Check your wiring!"));
-    while (1)
-      ;
-  }
-  if (!mag.begin()) {
-    Serial.println(F("Ooops, no LSM303 detected ... Check your wiring!"));
-    while (1)
-      ;
-  }
-}
 
 // This task will run on core 0 and will send data when it's ready
 void sendDataTask(void *pvParameters) {
@@ -111,6 +72,7 @@ void manageCommands(byte ctrl, const char *rx_string) {
   if (ctrl == fire_ctrl) {
     /*Fire*/
     Serial.println("Fire");
+    fireProcedure();
   } else if (ctrl == move_step_a_ctrl) {
     /*Move*/
     Serial.println("Stepper a");
@@ -253,10 +215,6 @@ void motorsTask(void *pvParameters) {
     stepper_az.run();
     vTaskDelay(1 / portTICK_PERIOD_MS);
   }
-}
-
-void gpioInit() {
-  pinMode(SW_PIN_HOME, INPUT_PULLUP);
 }
 
 void setup() {

@@ -1,4 +1,5 @@
 #define SW_PIN_HOME 32
+#define SW_LASER 33
 
 #define DIR_PIN_AZ 19
 #define STEP_PIN_AZ 18
@@ -27,3 +28,6 @@
 
 #define SFZN_VIZ_LWR_BND_EL 70
 #define SFZN_VIZ_HGH_BND_EL 135
+
+#define TRIGGER_FIRE_POS 135
+#define TRIGGER_REST_POS 90
