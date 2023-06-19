@@ -37,7 +37,6 @@ void initMotors() {
 
   /* Trigger servo */
   servo_trg.attach(SERVO_PIN_TRG);
-
 }
 
 /* Function to home-in the steppers */
@@ -86,9 +85,18 @@ void homingProcedure() {
 }
 
 /* Function to action the trigger */
-void fireProcedure(){
+void fireProcedure() {
   servo_trg.write(TRIGGER_FIRE_POS);
   delay(1000);
   servo_trg.write(TRIGGER_REST_POS);
   delay(100);
+}
+
+/* Function to signal back motor arrival */
+void motorCallback(AccelStepper* stepper) {
+  while (stepper->distanceToGo() != 0) {
+    //stepper->run();
+    vTaskDelay(1 / portTICK_PERIOD_MS);
+  }
+  Serial.println("Stepper arrived at destination");
 }

@@ -79,6 +79,7 @@ void manageCommands(byte ctrl, const char *rx_string) {
     angle = atof(rx_string);
     if (angle >= SFZN_SYS_LWR_BND_AZ && angle <= SFZN_SYS_HGH_BND_AZ) {
       stepper_az.moveTo(angle * MICROSTEPS / 1.8);
+      motorCallback(&stepper_az);
     } else {
       Serial.println("Stepper out of bounds");
     }
@@ -88,6 +89,7 @@ void manageCommands(byte ctrl, const char *rx_string) {
     angle = atof(rx_string);
     if (angle >= SFZN_SYS_LWR_BND_EL && angle <= SFZN_SYS_HGH_BND_EL) {
       stepper_el.moveTo(angle * MICROSTEPS / 1.8);
+      motorCallback(&stepper_el);
     } else {
       Serial.println("Stepper out of bounds");
     }

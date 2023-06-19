@@ -16,3 +16,6 @@ void homingProcedure();
 
 /* Function to action the trigger */
 void fireProcedure();
+
+/* Function to signal back motor arrival */
+void motorCallback(AccelStepper* stepper);
