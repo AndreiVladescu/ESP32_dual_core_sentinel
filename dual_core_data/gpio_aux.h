@@ -10,13 +10,13 @@
 
 /* Control */
 const int fire_ctrl = 0x10;
-const int move_step_a_ctrl = 0x20;
-const int move_step_e_ctrl = 0x30;
-const int send_orientation_ctrl = 0x40;
-const int move_servo_a_ctrl = 0x50;
-const int move_servo_e_ctrl = 0x60;
-const int scram_ctrl = 0x53;
-const int restore_ctrl = 0x52;
+const int move_step_a_ctrl = (int)'A';
+const int move_step_e_ctrl = (int)'E';
+const int send_orientation_ctrl = (int)'o';
+const int move_servo_a_ctrl = (int)'a';
+const int move_servo_e_ctrl = (int)'e';
+const int scram_ctrl = (int)'s';
+const int restore_ctrl = (int)'r';
 
 /* Median filter data type */
 typedef struct median_orientation_t {
@@ -25,6 +25,12 @@ typedef struct median_orientation_t {
         heading = 0;
   uint8_t overSampleRate = 31;
   uint8_t currentSampleCounter = 0;
+};
+
+/* Manage function parameter data type */
+typedef struct manage_function_t {
+  byte ctrl;
+  char rx_str[7];
 };
 
 /* Function to initialise sensors */

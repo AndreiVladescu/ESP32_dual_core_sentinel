@@ -1,3 +1,4 @@
+#include "freertos/projdefs.h"
 #include "motor_drivers.h"
 
 AccelStepper stepper_az(MOTOR_INTERFACE, STEP_PIN_AZ, DIR_PIN_AZ);
@@ -17,14 +18,14 @@ extern double az_angle;
 /* Function to initialise motors */
 void initMotors() {
   /* System-wide steppers */
-  stepper_az.setMaxSpeed(10000);
-  stepper_az.setSpeed(1000);
-  stepper_az.setAcceleration(1000);
+  stepper_az.setMaxSpeed(100000);
+  stepper_az.setSpeed(100000);
+  stepper_az.setAcceleration(10000);
   stepper_az.setEnablePin(ENABLE_PIN_AZ);
   stepper_az.disableOutputs();
 
   stepper_el.setMaxSpeed(10000);
-  stepper_el.setSpeed(1000);
+  stepper_el.setSpeed(5000);
   stepper_el.setAcceleration(1000);
   stepper_el.setEnablePin(ENABLE_PIN_EL);
   stepper_el.disableOutputs();
@@ -43,6 +44,7 @@ void initMotors() {
 void homingProcedure() {
 
   /* Elevation homing based on pitch data from the 9-DOF sensor */
+
   sensors_event_t accel_event;
   sensors_event_t mag_event;
   sensors_vec_t orientation;
@@ -50,20 +52,27 @@ void homingProcedure() {
   accel.getEvent(&accel_event);
   mag.getEvent(&mag_event);
 
-  while (!dof.fusionGetOrientation(&accel_event, &mag_event, &orientation)) {
-    vTaskDelay(1 / portTICK_PERIOD_MS);
+  int angle;
+  while (1) {
+    accel.getEvent(&accel_event);
+    mag.getEvent(&mag_event);
+
+    if (dof.fusionGetOrientation(&accel_event, &mag_event, &orientation)) {
+      angle = orientation.pitch;
+      //if (angle >= SFZN_SYS_LWR_BND_EL && angle <= SFZN_SYS_HGH_BND_EL) {
+      stepper_el.moveTo(angle * MICROSTEPS / 1.8);
+      while (stepper_el.distanceToGo() != 0) {
+        stepper_el.run();
+        Serial.println(angle);
+      }
+      break;
+    }
   }
-  float angle = -orientation.pitch;
-  stepper_el.moveTo(angle * MICROSTEPS / 1.8);
-  while (stepper_el.distanceToGo() != 0) {
-    stepper_el.run();
-    vTaskDelay(1 / portTICK_PERIOD_MS);
-  }
-  el_angle = 90;
+  stepper_el.setCurrentPosition(0);
 
   /* Azimuth homing based on end-stop switch */
   long max_distance = -999999;
-  stepper_az.moveTo(max_distance * MICROSTEPS);
+  stepper_az.moveTo(max_distance * MICROSTEPS * TEETH_GEAR_RATIO);
   while (stepper_az.distanceToGo() != 0) {
     stepper_az.run();
     // If stepper arrived to end switch, it's at almost 180 degrees out of phase
@@ -74,10 +83,11 @@ void homingProcedure() {
     vTaskDelay(1 / portTICK_PERIOD_MS);
   }
   while (digitalRead(SW_PIN_HOME) == LOW) {
-    stepper_az.move(50);
+    stepper_az.setCurrentPosition(-1);
+    stepper_az.move(1);
     stepper_az.runSpeed();
   }
-  stepper_az.moveTo(175 * MICROSTEPS / 1.8);
+  stepper_az.move(90 * MICROSTEPS / 1.8 * TEETH_GEAR_RATIO);
   while (stepper_az.distanceToGo() != 0) {
     stepper_az.run();
   }
@@ -96,7 +106,7 @@ void fireProcedure() {
 void motorCallback(AccelStepper* stepper) {
   while (stepper->distanceToGo() != 0) {
     //stepper->run();
-    vTaskDelay(1 / portTICK_PERIOD_MS);
+    //vTaskDelay(1 / portTICK_PERIOD_MS);
   }
   Serial.println("Stepper arrived at destination");
 }

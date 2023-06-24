@@ -6,6 +6,11 @@
 #include <AccelStepper.h>
 #include <ESP32Servo.h>
 
+#include "esp_task_wdt.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_timer.h" // ESP32 specific
+
 #include "config.h"
 
 /* Function to initialise motors */

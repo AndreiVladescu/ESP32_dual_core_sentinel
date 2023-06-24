@@ -6,7 +6,7 @@
 #include "gpio_aux.h"
 
 static const BaseType_t pro_cpu = 0;
-static const BaseType_t app_cpu = 0;
+static const BaseType_t app_cpu = 1;
 
 TaskHandle_t TaskSendData,
   TaskRecvData,
@@ -35,6 +35,7 @@ extern Servo servo_trg;
 // to prevent the compiler from optimizing out checks to this variable.
 volatile bool dataReadyFlag = false;
 volatile bool sendDataFlag = false;
+volatile bool taskExecuted = false;
 
 /* Current positon */
 double az_angle = 0;
@@ -78,7 +79,7 @@ void manageCommands(byte ctrl, const char *rx_string) {
     Serial.println("Stepper a");
     angle = atof(rx_string);
     if (angle >= SFZN_SYS_LWR_BND_AZ && angle <= SFZN_SYS_HGH_BND_AZ) {
-      stepper_az.moveTo(angle * MICROSTEPS / 1.8);
+      stepper_az.moveTo(angle * MICROSTEPS / 1.8 * TEETH_GEAR_RATIO);
       motorCallback(&stepper_az);
     } else {
       Serial.println("Stepper out of bounds");
@@ -130,6 +131,7 @@ void manageCommands(byte ctrl, const char *rx_string) {
     /*Carry on*/
     Serial.println("Carry on");
   }
+  taskExecuted = true;
 }
 
 // This task will run on core 0 and will receive data
@@ -155,7 +157,7 @@ void receiveDataTask(void *pvParameters) {
         continue;
       }
 
-      if (rx_i < max_chars && (isDigit(ch) || ch == '.')) {
+      if (rx_i < max_chars && (isDigit(ch) || ch == '.' || ch == '-')) {
         rx_string[rx_i++] = ch;
       } else {
         if (ch == '\n') {
@@ -215,13 +217,12 @@ void motorsTask(void *pvParameters) {
   while (1) {
     stepper_el.run();
     stepper_az.run();
-    vTaskDelay(1 / portTICK_PERIOD_MS);
+    //vTaskDelay(1 / portTICK_PERIOD_MS);
   }
 }
 
 void setup() {
   Serial.begin(115200);
-  Serial.println(F("Adafruit 9 DOF Pitch/Roll/Heading Example"));
 
   /* Initialise the sensors */
   initSensors();
@@ -261,13 +262,13 @@ void setup() {
                           NULL,
                           1,
                           &TaskComputeData,
-                          app_cpu);
+                          pro_cpu);
 
   xTaskCreatePinnedToCore(motorsTask,
                           "Motors running Task",
                           8192,
                           NULL,
-                          1,
+                          configMAX_PRIORITIES - 1,
                           &TaskMotors,
                           app_cpu);
 
