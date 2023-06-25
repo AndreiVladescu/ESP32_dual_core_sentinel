@@ -41,6 +41,9 @@ volatile bool taskExecuted = false;
 double az_angle = 0;
 double el_angle = 0;
 
+/* Laser variable */
+bool laser_switch = false;
+
 // This task will run on core 0 and will send data when it's ready
 void sendDataTask(void *pvParameters) {
   while (1) {
@@ -111,7 +114,7 @@ void manageCommands(byte ctrl, const char *rx_string) {
     Serial.println("Servo e");
     angle = atof(rx_string);
     if (angle >= SFZN_VIZ_LWR_BND_EL && angle <= SFZN_VIZ_HGH_BND_EL) {
-      servo_az.write(angle);
+      servo_el.write(angle);
     } else {
       Serial.println("Servo out of bounds");
     }
@@ -127,12 +130,18 @@ void manageCommands(byte ctrl, const char *rx_string) {
     // Inverted controls
     stepper_az.disableOutputs();
     stepper_el.disableOutputs();
+  }else if (ctrl == laser_ctrl) {
+    /*Toggle Laser*/
+    Serial.println("Laser Toggle");
+    laser_switch = !laser_switch;
+    digitalWrite(SW_LASER, laser_switch);
   } else {
     /*Carry on*/
     Serial.println("Carry on");
   }
   taskExecuted = true;
 }
+
 
 // This task will run on core 0 and will receive data
 void receiveDataTask(void *pvParameters) {

@@ -63,7 +63,6 @@ void homingProcedure() {
       stepper_el.moveTo(angle * MICROSTEPS / 1.8);
       while (stepper_el.distanceToGo() != 0) {
         stepper_el.run();
-        Serial.println(angle);
       }
       break;
     }
@@ -91,7 +90,8 @@ void homingProcedure() {
   while (stepper_az.distanceToGo() != 0) {
     stepper_az.run();
   }
-  stepper_az.setCurrentPosition(0);
+  stepper_az.setCurrentPosition(90* MICROSTEPS / 1.8 * TEETH_GEAR_RATIO);
+  Serial.println("Homing complete");
 }
 
 /* Function to action the trigger */

@@ -17,6 +17,7 @@ const int move_servo_a_ctrl = (int)'a';
 const int move_servo_e_ctrl = (int)'e';
 const int scram_ctrl = (int)'s';
 const int restore_ctrl = (int)'r';
+const int laser_ctrl = (int)'l';
 
 /* Median filter data type */
 typedef struct median_orientation_t {

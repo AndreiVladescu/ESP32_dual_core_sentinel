@@ -22,4 +22,6 @@ void initSensors() {
 void gpioInit() {
   pinMode(SW_PIN_HOME, INPUT_PULLUP);
   pinMode(SW_LASER, OUTPUT);
+  //pinMode(SERVO_PIN_AZ,OUTPUT);
+  //pinMode(SERVO_PIN_EL,OUTPUT);
 }
