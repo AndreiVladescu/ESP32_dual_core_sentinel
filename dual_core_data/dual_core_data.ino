@@ -170,7 +170,7 @@ void receiveDataTask(void *pvParameters) {
   unsigned long endTime;
 
   while (1) {
-    startTime = millis();
+    //startTime = millis();
     // Wait until data is received
     while (Serial.available() > 0) {
 
@@ -192,13 +192,13 @@ void receiveDataTask(void *pvParameters) {
         if (ch == '\n') {
           rx_string[rx_i] = 0;
           manageCommands((byte)buffer_byte, rx_string);
-          endTime = millis();
-          unsigned long executionTime = endTime - startTime;
+         // endTime = millis();
+          //unsigned long executionTime = endTime - startTime;
 
           // Output execution time
-          Serial.print("Execution Time: ");
-          Serial.print(executionTime);
-          Serial.println(" ms");
+          //Serial.print("Execution Time: ");
+          //Serial.print(executionTime);
+          //Serial.println(" ms");
         }
         rx_i = -1;
       }
@@ -211,7 +211,7 @@ void receiveDataTask(void *pvParameters) {
 void computeDataTask(void *pvParameters) {
   while (1) {
     if (dataReadyFlag) {
-      vTaskDelay(1);
+      vTaskDelay(5);
       continue;
     }
 
