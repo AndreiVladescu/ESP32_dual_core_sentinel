@@ -12,7 +12,8 @@ TaskHandle_t TaskSendData,
   TaskRecvData,
   TaskComputeData,
   TaskMotors,
-  TaskCommand;
+  TaskFire,
+  TaskMotorCallback;
 
 static SemaphoreHandle_t sensor_mutex;
 
@@ -49,7 +50,7 @@ void sendDataTask(void *pvParameters) {
   while (1) {
     // Wait until data is ready
     while (!dataReadyFlag || !sendDataFlag) {
-      vTaskDelay(1);  // This delay helps to prevent the task from hogging CPU time
+      vTaskDelay(5);  // This delay helps to prevent the task from hogging CPU time
     }
     xSemaphoreTake(sensor_mutex, portMAX_DELAY);
     Serial.print(int(medianOrientation.roll));
@@ -66,7 +67,7 @@ void sendDataTask(void *pvParameters) {
     // Reset the flags
     dataReadyFlag = false;
     sendDataFlag = false;
-    vTaskDelay(1 / portTICK_PERIOD_MS);
+    vTaskDelay(5);
   }
 }
 
@@ -75,15 +76,24 @@ void manageCommands(byte ctrl, const char *rx_string) {
 
   if (ctrl == fire_ctrl) {
     /*Fire*/
-    Serial.println("Fire");
-    fireProcedure();
+    xTaskCreate(fireProcedure,
+                "Trigger Task",
+                4096,
+                NULL,
+                3,
+                &TaskFire);
   } else if (ctrl == move_step_a_ctrl) {
     /*Move*/
     Serial.println("Stepper a");
     angle = atof(rx_string);
     if (angle >= SFZN_SYS_LWR_BND_AZ && angle <= SFZN_SYS_HGH_BND_AZ) {
       stepper_az.moveTo(angle * MICROSTEPS / 1.8 * TEETH_GEAR_RATIO);
-      motorCallback(&stepper_az);
+      xTaskCreate(motorCallback,
+                  "Motor Callback Azimuth Task",
+                  2048,
+                  &stepper_az,
+                  2,
+                  &TaskMotorCallback);
     } else {
       Serial.println("Stepper out of bounds");
     }
@@ -93,7 +103,12 @@ void manageCommands(byte ctrl, const char *rx_string) {
     angle = atof(rx_string);
     if (angle >= SFZN_SYS_LWR_BND_EL && angle <= SFZN_SYS_HGH_BND_EL) {
       stepper_el.moveTo(angle * MICROSTEPS / 1.8);
-      motorCallback(&stepper_el);
+      xTaskCreate(motorCallback,
+                  "Motor Callback Elevation Task",
+                  2048,
+                  &stepper_el,
+                  2,
+                  &TaskMotorCallback);
     } else {
       Serial.println("Stepper out of bounds");
     }
@@ -130,7 +145,7 @@ void manageCommands(byte ctrl, const char *rx_string) {
     // Inverted controls
     stepper_az.disableOutputs();
     stepper_el.disableOutputs();
-  }else if (ctrl == laser_ctrl) {
+  } else if (ctrl == laser_ctrl) {
     /*Toggle Laser*/
     Serial.println("Laser Toggle");
     laser_switch = !laser_switch;
@@ -140,20 +155,25 @@ void manageCommands(byte ctrl, const char *rx_string) {
     Serial.println("Carry on");
   }
   taskExecuted = true;
+  vTaskDelay(5);
 }
-
 
 // This task will run on core 0 and will receive data
 void receiveDataTask(void *pvParameters) {
   static double new_angle = 0;
-  static const int max_chars = 7;
+  static const int max_chars = 9;
   static char rx_string[max_chars];
   static int8_t rx_i = -1;
   static byte buffer_byte;
 
+  unsigned long startTime;
+  unsigned long endTime;
+
   while (1) {
+    startTime = millis();
     // Wait until data is received
     while (Serial.available() > 0) {
+
       char ch = Serial.read();
 
       //Serial.println(ch, HEX);
@@ -172,11 +192,18 @@ void receiveDataTask(void *pvParameters) {
         if (ch == '\n') {
           rx_string[rx_i] = 0;
           manageCommands((byte)buffer_byte, rx_string);
+          endTime = millis();
+          unsigned long executionTime = endTime - startTime;
+
+          // Output execution time
+          Serial.print("Execution Time: ");
+          Serial.print(executionTime);
+          Serial.println(" ms");
         }
         rx_i = -1;
       }
     }
-    vTaskDelay(1 / portTICK_PERIOD_MS);
+    vTaskDelay(5);
   }
 }
 
@@ -184,7 +211,7 @@ void receiveDataTask(void *pvParameters) {
 void computeDataTask(void *pvParameters) {
   while (1) {
     if (dataReadyFlag) {
-      vTaskDelay(1 / portTICK_PERIOD_MS);
+      vTaskDelay(1);
       continue;
     }
 
@@ -218,15 +245,18 @@ void computeDataTask(void *pvParameters) {
     xSemaphoreGive(sensor_mutex);
 
     // This delay helps to prevent the task from hogging CPU time
-    vTaskDelay(1 / portTICK_PERIOD_MS);
+    vTaskDelay(5);
   }
 }
 
 void motorsTask(void *pvParameters) {
   while (1) {
-    stepper_el.run();
-    stepper_az.run();
-    //vTaskDelay(1 / portTICK_PERIOD_MS);
+    if (stepper_az.distanceToGo() != 0 || stepper_el.distanceToGo() != 0) {
+      stepper_el.run();
+      stepper_az.run();
+    } else {
+      vTaskDelay(1);
+    }
   }
 }
 
@@ -253,7 +283,7 @@ void setup() {
                           "Send Data Task",
                           8192,
                           NULL,
-                          1,
+                          tskIDLE_PRIORITY,
                           &TaskSendData,
                           pro_cpu);
 
@@ -261,7 +291,7 @@ void setup() {
                           "Receive Data Task",
                           8192,
                           NULL,
-                          1,
+                          configMAX_PRIORITIES - 1,
                           &TaskRecvData,
                           pro_cpu);
 
@@ -269,7 +299,7 @@ void setup() {
                           "Compute Data Task",
                           8192,
                           NULL,
-                          1,
+                          tskIDLE_PRIORITY,
                           &TaskComputeData,
                           pro_cpu);
 

@@ -15,6 +15,9 @@ extern Adafruit_LSM303_Mag_Unified mag;
 extern double el_angle;
 extern double az_angle;
 
+extern TaskHandle_t TaskFire;
+extern TaskHandle_t TaskMotorCallback;
+
 /* Function to initialise motors */
 void initMotors() {
   /* System-wide steppers */
@@ -79,7 +82,7 @@ void homingProcedure() {
     if (digitalRead(SW_PIN_HOME) == LOW) {
       break;
     }
-    vTaskDelay(1 / portTICK_PERIOD_MS);
+    vTaskDelay(1);
   }
   while (digitalRead(SW_PIN_HOME) == LOW) {
     stepper_az.setCurrentPosition(-1);
@@ -90,23 +93,26 @@ void homingProcedure() {
   while (stepper_az.distanceToGo() != 0) {
     stepper_az.run();
   }
-  stepper_az.setCurrentPosition(90* MICROSTEPS / 1.8 * TEETH_GEAR_RATIO);
+  stepper_az.setCurrentPosition(90 * MICROSTEPS / 1.8 * TEETH_GEAR_RATIO);
   Serial.println("Homing complete");
 }
 
 /* Function to action the trigger */
-void fireProcedure() {
+void fireProcedure(void* pvParameters) {
   servo_trg.write(TRIGGER_FIRE_POS);
   delay(1000);
   servo_trg.write(TRIGGER_REST_POS);
-  delay(100);
+  Serial.println("Fired");
+  vTaskDelete(TaskFire);
 }
 
 /* Function to signal back motor arrival */
-void motorCallback(AccelStepper* stepper) {
+void motorCallback(void* stepper_void) {
+  AccelStepper* stepper = (AccelStepper*)stepper_void;
   while (stepper->distanceToGo() != 0) {
     //stepper->run();
     //vTaskDelay(1 / portTICK_PERIOD_MS);
   }
   Serial.println("Stepper arrived at destination");
+  vTaskDelete(TaskFire);
 }

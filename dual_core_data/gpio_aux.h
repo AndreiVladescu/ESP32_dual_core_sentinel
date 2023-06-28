@@ -9,7 +9,7 @@
 #include "config.h"
 
 /* Control */
-const int fire_ctrl = 0x10;
+const int fire_ctrl = (int)'f';
 const int move_step_a_ctrl = (int)'A';
 const int move_step_e_ctrl = (int)'E';
 const int send_orientation_ctrl = (int)'o';
