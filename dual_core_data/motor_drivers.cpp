@@ -36,7 +36,7 @@ void initMotors() {
   /* Visor servos */
   servo_az.attach(SERVO_PIN_AZ);
   servo_el.attach(SERVO_PIN_EL);
-  servo_az.write(90);
+  servo_az.write(90 - DEFAULT_SERVO_OFFSET);
   servo_el.write(90);
 
   /* Trigger servo */
