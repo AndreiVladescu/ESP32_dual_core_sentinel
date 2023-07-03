@@ -84,7 +84,7 @@ void manageCommands(byte ctrl, const char *rx_string) {
                 &TaskFire);
   } else if (ctrl == move_step_a_ctrl) {
     /*Move*/
-    Serial.println("Stepper a");
+    //Serial.println("Stepper a");
     angle = atof(rx_string);
     if (angle >= SFZN_SYS_LWR_BND_AZ && angle <= SFZN_SYS_HGH_BND_AZ) {
       stepper_az.moveTo(angle * MICROSTEPS / 1.8 * TEETH_GEAR_RATIO);
@@ -99,7 +99,7 @@ void manageCommands(byte ctrl, const char *rx_string) {
     }
   } else if (ctrl == move_step_e_ctrl) {
     /*Move*/
-    Serial.println("Stepper e");
+   // Serial.println("Stepper e");
     angle = atof(rx_string);
     if (angle >= SFZN_SYS_LWR_BND_EL && angle <= SFZN_SYS_HGH_BND_EL) {
       stepper_el.moveTo(angle * MICROSTEPS / 1.8);
@@ -117,19 +117,19 @@ void manageCommands(byte ctrl, const char *rx_string) {
     sendDataFlag = true;
   } else if (ctrl == move_servo_a_ctrl) {
     /*Move*/
-    Serial.println("Servo a");
     angle = atof(rx_string);
     if (angle >= SFZN_VIZ_LWR_BND_AZ && angle <= SFZN_VIZ_HGH_BND_AZ) {
       servo_az.write(angle);
+      Serial.println("Srv a");
     } else {
       Serial.println("Servo out of bounds");
     }
   } else if (ctrl == move_servo_e_ctrl) {
     /*Move*/
-    Serial.println("Servo e");
     angle = atof(rx_string);
     if (angle >= SFZN_VIZ_LWR_BND_EL && angle <= SFZN_VIZ_HGH_BND_EL) {
       servo_el.write(angle);
+      Serial.println("Srv e");
     } else {
       Serial.println("Servo out of bounds");
     }
@@ -192,7 +192,7 @@ void receiveDataTask(void *pvParameters) {
         if (ch == '\n') {
           rx_string[rx_i] = 0;
           manageCommands((byte)buffer_byte, rx_string);
-         // endTime = millis();
+          // endTime = millis();
           //unsigned long executionTime = endTime - startTime;
 
           // Output execution time
@@ -260,6 +260,15 @@ void motorsTask(void *pvParameters) {
   }
 }
 
+void confirmConnection() {
+  while (Serial.available() == 0) {
+    vTaskDelay(10);
+  }
+  while (Serial.available() > 0) {
+    char ch = Serial.read();
+  }
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -271,6 +280,9 @@ void setup() {
 
   /* GPIO config */
   gpioInit();
+
+  /* Get confirmation of a PC connection */
+  // confirmConnection();
 
   /* Home in */
   homingProcedure();
