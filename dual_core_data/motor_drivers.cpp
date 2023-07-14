@@ -103,10 +103,10 @@ void fireProcedure(void* pvParameters) {
   //TimerHandle_t myTimer;
   //myTimer = xTimerCreate("Fire Procedure Timer", pdMS_TO_TICKS(1000), pdTRUE, 0, NULL);
   //while (1) {
-    //if (xTimerIsTimerActive(myTimer) == pdFALSE) {
-   //   break;
-    //}
-   // vTaskDelay(pdMS_TO_TICKS(100));
+  //if (xTimerIsTimerActive(myTimer) == pdFALSE) {
+  //   break;
+  //}
+  // vTaskDelay(pdMS_TO_TICKS(100));
   //}
   delay(600);
   servo_trg.write(TRIGGER_REST_POS);
@@ -121,18 +121,13 @@ void timerMotorCallback(TimerHandle_t xTimer) {
 
 /* Function to signal back motor arrival */
 void motorCallback(void* stepper_void) {
-  try {
-    TimerHandle_t myTimer;
-    AccelStepper* stepper = (AccelStepper*)stepper_void;
-    if (stepper != nullptr) {
-      myTimer = xTimerCreate("Motor Callback Timer", pdMS_TO_TICKS(1000), pdFALSE, 0, timerMotorCallback);
-      xTimerStart(myTimer, portMAX_DELAY);
-      while (stepper->distanceToGo() != 0) {
-        vTaskDelay(pdMS_TO_TICKS(10));
-      }
+  TimerHandle_t myTimer;
+  AccelStepper* stepper = (AccelStepper*)stepper_void;
+  if (stepper != NULL) {
+    while (stepper->distanceToGo() != 0) {
+      vTaskDelay(pdMS_TO_TICKS(4));
     }
-  } catch (int e) {
   }
   Serial.println("Stp arr");
-  vTaskDelete(TaskFire);
+  vTaskDelete(NULL);
 }
